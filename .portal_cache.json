@@ -1,0 +1,28 @@
+{
+ "Ciena India": {
+  "type": "workday",
+  "tenant": "ciena",
+  "wd": "wd5",
+  "site": "Careers",
+  "url": "https://ciena.wd5.myworkdayjobs.com/Careers"
+ },
+ "Paytm": {
+  "type": "lever",
+  "id": "paytm",
+  "url": "https://jobs.lever.co/paytm"
+ },
+ "Samsung R&D Institute Noida (SRI-N)": {
+  "type": "workday",
+  "tenant": "sec",
+  "wd": "wd3",
+  "site": "Samsung_Careers",
+  "url": "https://sec.wd3.myworkdayjobs.com/Samsung_Careers"
+ },
+ "Stryker": {
+  "type": "workday",
+  "tenant": "stryker",
+  "wd": "wd1",
+  "site": "StrykerCareers",
+  "url": "https://stryker.wd1.myworkdayjobs.com/StrykerCareers"
+ }
+}

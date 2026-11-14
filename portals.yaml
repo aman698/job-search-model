@@ -1,0 +1,737 @@
+# portals.yaml - har company ke OFFICIAL job portal ki recipe (job_checker.py isse padhta hai)
+# ------------------------------------------------------------------------------------------
+# Key = Excel ke "Company" column ka naam, bilkul same (spelling/brackets tak).
+# Sab recipes 2026-11-13 ko ek baar live test ki gayi thi. Agar kisi company ka portal badal jaaye
+# ("Blocked" / error aaye), us company ka careers page browser mein kholo aur yahan recipe update karo.
+#
+# Supported types:
+#   workday        url: https://<tenant>.wdN.myworkdayjobs.com/<site>
+#   eightfold      host, domain, mode (pcsx|v2), locations: [...]
+#   smartrecruiters id      | lever id      | greenhouse id
+#   oracle         host, site, [location_facet_id], [public_job_url]
+#   talentbrew     url      (Radancy career sites, e.g. careers.arm.com)
+#   avature        url, [terms], [offset_param], [per_page_param], [per_page], [list_filter_mode], [company_filter]
+#   sf_csb         host, locationsearch          (SuccessFactors Career Site Builder)
+#   sf_classic_xml url, url_template             (SuccessFactors classic XML feed)
+#   jibe           host, location                (iCIMS Jibe)
+#   csod           corp, site                    (Cornerstone OnDemand)
+#   darwinbox      host
+#   json_api       method, url, params/json/data, items, fields, url_template, page  (koi bhi JSON endpoint)
+#   html_list      urls, link_pattern | item_regex, default_location, fetch_details
+#   manual         url, note, [status]  -> script check nahi karta, sirf Portal Status mein note dikhata hai
+#   same_as        "<other company>"   -> dusri company ka hi portal (jaise Ansys -> Synopsys)
+#
+# Nayi company add karni ho: Excel mein row daalo. Agar yahan recipe nahi hogi to script website se
+# careers page khud dhoondhne ki koshish karega (Workday/Lever/Greenhouse/SmartRecruiters/Oracle pehchanta hai).
+
+overrides:
+
+  # ======================= Automotive / EV =======================
+  # Portal recipes for agent A companies (Delhi NCR automotive/EV). Verified 2026-11-13 with python requests.
+
+  # verified 2026-11-13: Darwinbox candidate API (/ms/candidateapi/job) returns 6 jobs (all Pune at the time)
+  "Minda Corporation (Spark Minda)": {type: darwinbox, host: "sparkminda-hris.darwinbox.in"}
+
+  # verified 2026-11-13: careers page lists 3 jobs as /apply-now/<slug> links (Noida tool-room roles).
+  # NOTE: the link text is an arrow SVG; the title is in the <h5 class="title21"> just above each link (slug is also readable).
+  # Detail pages are only an apply form (no JD/date), so fetch_details is off; date/exp/location are on the list page.
+  "Subros":
+    type: html_list
+    urls: ["https://www.subros.com/career"]
+    link_pattern: "/apply-now/[a-z0-9-]+"
+    default_location: "Noida"
+    fetch_details: false
+
+  # verified 2026-11-13: 'Current Openings' tab only says email careers@yamaha-motor-india.com (no listings)
+  "Yamaha Motor India":
+    type: manual
+    url: "https://www.yamaha-motor-india.com/career-home.html?pageId=open"
+    note: "Email-only page, no job listings. Send CV to careers@yamaha-motor-india.com."
+
+  # verified 2026-11-13: Param.ai feed returns 435 jobs grouped by category (data.<Category>.jobs); min_exp/max_exp are in MONTHS
+  "Maruti Suzuki India":
+    type: json_api
+    method: GET
+    url: "https://maruti.app.param.ai/api/career/get_job/"
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: "data.*.jobs"            # '*' = every category key under data; each has a 'jobs' list
+    fields:
+      title: "title"
+      location: "locations"         # list of city names, e.g. ["Gurugram"]
+      posted: "published_on_career_page"
+      desc: "description"
+      url: "apply_url"
+      exp_min: "min_exp"
+      exp_max: "max_exp"
+    exp_divisor: 12                 # min_exp/max_exp are in months
+    url_template: "https://maruti.app.param.ai/jobs/{slug}"
+
+  # verified 2026-11-13: Darwinbox candidate API returns 40 jobs (Manesar, Farukhnagar-Gurugram, Delhi, Pune, ...)
+  "Uno Minda": {type: darwinbox, host: "inspire-unominda.darwinbox.in"}
+
+  # verified 2026-11-13: www.napino.com/career 301-redirects to an unrelated gambling site (luxury138gary.org); no ATS found
+  "Napino Auto & Electronics":
+    type: manual
+    url: "https://www.napino.com/"
+    note: "Careers link is broken/hijacked (redirects off-site). No job portal found. Contact info@napinotech.com or check LinkedIn manually."
+
+  # verified 2026-11-13: 'Join Us' -> https://sonacomstar.com/career returns HTTP 404; no ATS found
+  "Sona Comstar":
+    type: manual
+    url: "https://sonacomstar.com/career"
+    note: "Careers page returns 404 and no ATS is linked. Re-check the site manually."
+
+  # verified 2026-11-13: static page, openings are plain text accordions with no per-job links (CS, IT, Accounts only)
+  "Lumax Industries / Lumax Auto Tech":
+    type: manual
+    url: "https://www.lumaxworld.in/current-openings.html"
+    note: "Static text list, no job links to parse. Read the page manually; CVs via springboard@lumaxmail.com (work-with-us page)."
+
+  # verified 2026-11-13: TurboHire career page; its API needs a bearer token from GET https://thapi.azurewebsites.net/api/token/noauth
+  # then POST https://thapi.azurewebsites.net/api/careerpagev2/filteredjobs?orgId=ac210007-77a2-4e11-91b9-79697a126680&pageType=0 (body {}) -> 1 job
+  "Honda Motorcycle & Scooter India":
+    type: manual
+    url: "https://hmsi.turbohire.co/careerpage/ac210007-77a2-4e11-91b9-79697a126680"
+    note: "TurboHire (JS app). Listing API needs a 2-step anonymous token (see comment above), which json_api cannot do. Check the page in a browser."
+
+  # verified 2026-11-13: SuccessFactors CSB search, locationsearch=India returns all 75 jobs (Gurgaon-only filter gives 21)
+  "Hero MotoCorp": {type: sf_csb, host: "jobs.heromotocorp.com", locationsearch: "India"}
+
+  # verified 2026-11-13: Our People page has no listings, only 'send CV to corporate.hr@jbmgroup.com'; /careers is 404
+  "JBM Group (JBM Electric)":
+    type: manual
+    url: "https://www.jbmgroup.com/our-people/"
+    note: "Email-only, no job listings. Send CV to corporate.hr@jbmgroup.com."
+
+  # verified 2026-11-13: openings page loads jobs via JS from a credentialed API proxy (not usable);
+  # public Darwinbox candidate API at buzz.darwinbox.in (company 'Exicom Group') returns 0 jobs
+  "Exicom":
+    type: manual
+    url: "https://www.exicom.com/careers/current-openings"
+    note: "JS-rendered list from a private API proxy; public Darwinbox (buzz.darwinbox.in) shows 0 jobs. Open the page in a browser."
+    status: "Blocked"
+
+  # ======================= Electronics / fintech / power =======================
+  # portals_B.yaml - recipes for agent B's 14 companies (Delhi NCR embedded/firmware sweep)
+  # All recipes were tested once with python requests on 2026-11-13 (see per-entry comments).
+  # Conventions used below:
+  #   items: ""  -> the JSON response root itself is the list of jobs.
+  #   A per-entry `headers: {User-Agent: ...}` overrides the script's default UA (needed for Havells only).
+
+  # verified 2026-11-13: Lever postings API returns 201 jobs (98 Noida); none embedded/firmware
+  "Paytm": {type: lever, id: "paytm"}
+
+  # verified 2026-11-13: the endpoint the careers page (pinelabs.com/careers/open-jobs) POSTs to; HTTP 200 JSON,
+  # but it currently returns {"Total":0} for every body (page shows "No jobs found"). Item fields below come from
+  # the page's own JS (JobId, JobTitle, Department, Location, JobType, ApplyUrl). Location may be a JSON string
+  # like '[{"Address":"Noida, Uttar Pradesh, India"}]' - parse it if so. The site itself pages with Skip/Top=50;
+  # a single call with Top=100 is used here because the {offset} placeholder would be inserted as a string.
+  "Pine Labs":
+    type: json_api
+    method: POST
+    url: "https://www.pinelabs.com/api/gateway/turbo-hire"
+    json:
+      Skip: 0
+      Top: 100
+      SortBy: "None"
+      Filters: {Departments: [], Locations: [], JobTypes: [], SearchString: "{term}"}
+      GetFiltersData: false
+    headers: {Accept: "application/json", Content-Type: "application/json"}
+    terms: [""]
+    items: "Jobs"
+    fields:
+      title: "JobTitle"
+      location: "Location"
+      url: "ApplyUrl"
+
+  # verified 2026-11-13: this is the careers page's own title search (it POSTs selectTitle; GET with the same param works too).
+  # It returns [] because the page says "we don't have any job vacancies". IMPORTANT: from python-requests, a browser
+  # User-Agent gets HTTP 406 here, while a plain UA ("job-checker/1.0" or the python-requests default) gets 200 JSON.
+  # The search matches job titles only and needs at least 3 characters. Each item is {"position": "..."}. The site builds
+  # the job link as career-opportunities/?position=<position>, so URL-encode it. The API gives no location field.
+  "Havells":
+    type: json_api
+    method: GET
+    url: "https://havells.com/job/index/search"
+    params: {selectTitle: "{term}"}
+    headers: {Accept: "application/json", User-Agent: "job-checker/1.0"}
+    terms: ["embedded", "firmware"]
+    items: ""
+    fields:
+      title: "position"
+    url_template: "https://havells.com/corporate/careers/career-opportunities/?position={position}"
+
+  # verified 2026-11-13: standard Darwinbox candidate API (linked from dixoninfo.com/job-openings) returns jobscount=1
+  # (Assistant Manager - Quality, Tirupati). Detail JSON: /ms/candidateapi/job/{id}. Equivalent short form would be
+  # {type: darwinbox, host: "dixon.darwinbox.in"}
+  "Dixon Technologies":
+    type: json_api
+    method: GET
+    url: "https://dixon.darwinbox.in/ms/candidateapi/job"
+    params: {page: "{page}", limit: "50"}
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: "message.jobs"
+    fields:
+      title: "title"
+      location: "officelocation_show_arr"
+      posted: "created_on"
+    url_template: "https://dixon.darwinbox.in/ms/candidate/careers/{id}"
+    page: {start: 1, step: 1, max: 5}
+
+  # verified 2026-11-13: endpoint the joblist page calls; HTTP 200 JSON, currently [] (no openings). Field names come
+  # from the page JS: designation (title), alm.name (location), adm.department_name, experience_year, id.
+  # Detail JSON: https://www.lavamobiles.com/api/openpositionsingleview?id={id}. There is no per-job page, so url = the list page.
+  "Lava International":
+    type: json_api
+    method: GET
+    url: "https://www.lavamobiles.com/api/openpositionlist"
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: ""
+    fields:
+      title: "designation"
+      location: "alm.name"
+    url_template: "https://www.lavamobiles.com/career/joblist"
+
+  # verified 2026-11-13: no careers page on micromaxinfo.com (/career, /careers, /join-us all 404)
+  "Bhagwati Products (Micromax EMS)":
+    type: manual
+    url: "https://www.micromaxinfo.com/bhagwati-products-limited"
+    note: "No careers page or job listings on micromaxinfo.com; only third-party plant-hiring posts exist. Check LinkedIn manually."
+
+  # verified 2026-11-13: optiemus.com has no careers page (careers.html/career.html 404); contact page shows only care@optiemus.com
+  "Optiemus Electronics":
+    type: manual
+    url: "https://www.optiemus.com/contactus.php"
+    note: "No careers page or listings on optiemus.com. Check LinkedIn manually."
+
+  # verified 2026-11-13: careers page has a resume-submission form only, no listings
+  "PG Electroplast":
+    type: manual
+    url: "https://pgel.in/careers.html"
+    note: "Resume form only ('Join our team / Submit Request'), no listings. Check manually."
+
+  # verified 2026-11-13: page lists 4 openings inline (all Ghaziabad) but with NO per-job links (every 'Apply Now' is href="#").
+  # link_pattern cannot match anything here. item_regex (named groups) pulls title+location from each div.vacancy-box;
+  # tested: 4 matches. If the script has no item_regex support, treat this entry as manual.
+  "Elin Electronics":
+    type: html_list
+    urls: ["https://www.elinindia.com/careers/"]
+    link_pattern: null
+    item_regex: '<span class="vacancy-title">(?P<title>[^<]+)</span>.*?<div class="vacancy-location"><span[^>]*></span>(?P<location>[^<]*)</div>'
+    default_location: "Ghaziabad"
+    fetch_details: false
+
+  # verified 2026-11-13: SAP SuccessFactors Career Site Builder; /search/?q=&locationsearch=&startrow=N lists all 14 jobs (5 per page)
+  "Luminous Power Technologies": {type: sf_csb, host: "careers.luminousindia.com", locationsearch: ""}
+
+  # verified 2026-11-13: amber's own page has no listings; its 'View Current Openings' button points to Naukri (HTTP 403 to scripts)
+  "Amber Enterprises":
+    type: manual
+    url: "https://www.ambergroupindia.com/careers/"
+    note: "No listings on the official page; 'View Current Openings' goes to naukri.com/amber-enterprises-india-overview-4576343 (aggregator, blocks scripts). Check manually."
+    status: "Blocked"
+
+  # verified 2026-11-13: WordPress 'WP Job Openings' REST route returns all 7 jobs (X-WP-Total=7). The API has no
+  # location field; location appears in the description text (e.g. 'Location : Chennai'), and the list page also shows it.
+  "Syrma SGS Technology":
+    type: json_api
+    method: GET
+    url: "https://syrmasgs.com/wp-json/wp/v2/awsm_job_openings"
+    params: {per_page: "100"}
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: ""
+    fields:
+      title: "title.rendered"
+      posted: "date"
+      desc: "content.rendered"
+      url: "link"
+
+  # verified 2026-11-13 (with caveat): the official job board is sindia.co.in (statconelectronics.com does not resolve).
+  # 3 list pages hold 28 jobs; job links contain /jobs/. With python requests, these HTML pages return Cloudflare 520
+  # for a browser UA and 403 for the default UA. They were readable only via a browser-like fetcher (WebFetch), so the
+  # script will probably get an error here; then check manually. Observation only, not used: the site's WordPress REST route
+  # /wp-json/wp/v2/awsm_job_openings?per_page=100 returned all 28 jobs (200) to a default-UA python request, but the
+  # careers page does not call it.
+  "Statcon Electronics":
+    type: html_list
+    urls: ["https://sindia.co.in/job-openings/", "https://sindia.co.in/job-openings/?paged=2", "https://sindia.co.in/job-openings/?paged=3"]
+    link_pattern: "/jobs/"
+    default_location: "Noida"
+    fetch_details: true
+
+  # verified 2026-11-13: the jobs page calls this endpoint (jQuery POST of the same fields; GET works too). It returns
+  # success with postManagementVoList=[] (no India postings). Item fields come from the page JS: postName, postType,
+  # workAddress, duty, requirement, jumpLink, id. Apply link = jumpLink if set, else /in/email/subemail?id={id}.
+  # Stop paging when data.postManagementVoList is empty or page > data.allPage.
+  "Vivo India":
+    type: json_api
+    method: GET
+    url: "https://www.vivo.com/in/aboutVivo/queryPostManagementByCondition"
+    params: {postType: "", workAddress: "", postName: "{term}", page: "{page}"}
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: "data.postManagementVoList"
+    fields:
+      title: "postName"
+      location: "workAddress"
+      desc: "duty"
+    url_template: "https://www.vivo.com/in/email/subemail?id={id}"
+    page: {start: 1, step: 1, max: 5}
+
+  # ======================= Embedded services / Japanese & Korean MNCs =======================
+  # portals_C.yaml - recipes for agent C's 10 companies (verified 2026-11-13 with python requests)
+  # Notes on two small extensions to portal_schema.md (flagged where used):
+  #   json_api.data  = form-encoded POST body (like `json`, same {placeholders}); needed by VVDN and HSC/Zwayam.
+  #   sf_classic_xml = SAP SuccessFactors *classic* career site XML feed (not Career Site Builder); used by Denso.
+
+  # verified 2026-11-13: Darwinbox candidate API (/ms/candidateapi/job?page=1&limit=100) returns 34 jobs (jobscount=34);
+  # location in officelocation_show_arr / tool_tip_locations; job page https://tessolve.darwinbox.com/ms/candidate/careers/{id}
+  "Tessolve":
+    type: darwinbox
+    host: "tessolve.darwinbox.com"
+
+  # verified 2026-11-13: Arrow Workday site AC returns 546 jobs, 7 NCR (eInfochips jobs are posted here; einfochips.com/careers is 403 to bots)
+  "eInfochips (Arrow)":
+    type: workday
+    url: "https://arrow.wd1.myworkdayjobs.com/AC"
+
+  # verified 2026-11-13: POST form job_type=all returns {"status":true,"data":[65 jobs]}; the site's own new-openings page calls this.
+  # NOTE: for old (2021) records `title` is generic ("Sr Engineer") and the role is in `short_role`; key skills in `key_skills`.
+  "VVDN Technologies":
+    type: json_api
+    method: POST
+    url: "https://www.vvdntech.com/newsroom/careers_and_jobs/get_jobs"
+    data: {job_type: "all"}          # extension: form-encoded body
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: "data"
+    fields:
+      title: ["title", "short_role"]
+      location: "job_location"       # comma-separated, e.g. "Gurgaon,Manesar"
+      posted: "created_at"
+      desc: "description"
+      exp_min: "experience_min"
+      exp_max: "experience_max"
+    url_template: "https://www.vvdntech.com/careers/lateral-registration?job_id={job_id}"
+
+  # verified 2026-11-13: Zwayam search (called by careers.hsc.com/hsc/) returns totalCount=11, 10 per page.
+  # hsc.com itself is behind a Cloudflare challenge. Hughes India (hughes.in) careers is email-only; EchoStar (Jibe) had 0 NCR embedded.
+  # companyId must be the base64 string "MTUzNjY=" (=15366). paginationStartNo inside filterCri = offset (0, 10, 20...).
+  "Hughes Systique / Hughes India":
+    type: json_api
+    method: POST
+    url: "https://public.zwayam.com/jobs/search"
+    data:                            # extension: form-encoded body (multipart also works)
+      filterCri: '{"paginationStartNo":{offset},"selectedCall":"sort","sortCriteria":{"name":"modifiedDate","isAscending":false},"anyOfTheseWords":""}'
+      domain: "careers.hsc.com"
+      companyId: "MTUzNjY="
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: "data.data"
+    fields:
+      title: "_source.jobTitle"
+      location: "_source.locationSeparatedbySlash"
+      posted: "_source.jobCreatedDate"     # epoch milliseconds
+      desc: "_source.mediumDescription"
+    url_template: "https://careers.hsc.com/hsc/jobview/{_source.jobUrl}"
+    page: {start: 0, step: 10, max: 5}   # {offset} = start + n*step
+
+  # verified 2026-11-13: Keka embed API (used by samtelavionics.com/current-opening) returns a JSON list of 24 active jobs, all Gurugram.
+  "Samtel Avionics":
+    type: json_api
+    method: GET
+    url: "https://samtel.keka.com/careers/api/embedjobs/default/active/57116a0c-2b65-4fe7-a1d4-04fc00c14f87"
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: ""                        # response root is the list
+    fields:
+      title: "title"
+      location: "jobLocations.0.name"  # list of {city,name}; all "Gurugram" today
+      posted: "publishedOn"
+      desc: "description"
+    url_template: "https://samtel.keka.com/careers/jobdetails/{id}"
+    default_location: "Gurugram"
+
+  # verified 2026-11-13: lg.com/in/about-lg/careers redirects to globalcareers.lge.com/locations/IN; API returns total=28 for countries=IN
+  # (all LGSI R&D; only 1 in Noida). One call with size=100 returns all (max size 100; size=200 errors).
+  # CAUTION if paging is ever added: out-of-range pages repeat the LAST page - stop when data.isLastPage is true.
+  "LG Electronics":
+    type: json_api
+    method: GET
+    url: "https://globalcareers.lge.com/api/job/v1/jobs/"
+    params: {langCd: "en", countries: "IN", page: "1", size: "100"}
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: "data.list"
+    fields:
+      title: "title"
+      location: "location"
+      posted: "postCreateDtm"        # array [Y,M,D,h,m,s]
+      desc: "content"
+    url_template: "https://globalcareers.lge.com/jobs/{id}"
+
+  # verified 2026-11-13: XML feed returns 5 <Job> items (ReqId 544, 994, 997, 999, 1007); denso.com/in careers is Akamai-403.
+  # extension type. Parse each <Job>: JobTitle, ReqId, Job-Description (HTML, CDATA); location = <value> after <label>Job Location</label>.
+  # The feed is NOT strict XML (raw HTML inside) - parse with regex, not ElementTree. Posted date is blank on the site.
+  "Denso (India)":
+    type: sf_classic_xml
+    url: "https://career44.sapsf.com/career?company=densoharya&career_ns=job_listing_summary&resultType=XML"
+    url_template: "https://career44.sapsf.com/career?career_ns=job_listing&company=densoharya&career_job_req_id={ReqId}"
+    default_location: "Gurgaon"
+
+  # verified 2026-11-13: no MEAI careers page exists; Mitsubishi Electric India careers hub links only MEI and Mitsubishi Elevator pages;
+  # MEAI location page lists only contact@meai-india.com (domain does not resolve).
+  "Mitsubishi Electric Automotive India":
+    type: manual
+    url: "https://in.mitsubishielectric.com/en/about/local/careers/"
+    note: "No MEAI job portal. Check the Mitsubishi Electric India hub manually / email contact@meai-india.com / LinkedIn."
+
+  # verified 2026-11-13: page is a resume-upload form; no openings listed (shows 'upload your resume' message).
+  "Mitsubishi Electric India":
+    type: manual
+    url: "https://www.mitsubishielectric.in/careers"
+    note: "Resume upload form only, no listings. Check manually."
+
+  # verified 2026-11-13: panasonic.com/in/corporate/careers.html and holdings.panasonic careers return 403 (Akamai bot block).
+  # Group site lsin.panasonic.com/career (Panasonic Life Solutions India) is readable but its job data is embedded in the
+  # Next.js page payload (SuccessFactors OData), not a public JSON endpoint; 86 reqs, NCR ones sales/lighting, all postings Expired.
+  "Panasonic India":
+    type: manual
+    url: "https://www.panasonic.com/in/corporate/careers.html"
+    note: "Blocked to scripts (Akamai 403). Check in a browser; also see https://lsin.panasonic.com/career (Panasonic Life Solutions India)."
+    status: "Blocked"
+
+  # ======================= IT / ER&D services + Samsung R&D =======================
+  # portals_D.yaml - recipes for agent D's companies (verified 2026-11-13 with python requests through v2/job_checker.py fetchers)
+  # Uses the json_api extensions: items with '*' and page start 0.
+
+  # verified 2026-11-13: SuccessFactors CSB JSON API (the call careers.hcltech.com/search/ makes) works without a CSRF token.
+  # Its 'location' param does not filter (Noida -> 0), so search by keyword and let the script filter on custprimecity.
+  # Keyword search is full-text: embedded=528, firmware=247, AUTOSAR=11, BSP=16 jobs worldwide (10 per page).
+  # Job page = https://careers.hcltech.com/job/{urlTitle}/{id}-en_US/ (city is also in the JD header line).
+  "HCLTech (Engineering & R&D Services)":
+    type: json_api
+    method: POST
+    url: "https://careers.hcltech.com/services/recruiting/v1/jobs"
+    json:
+      locale: "en_US"
+      pageNumber: "{page}"
+      sortBy: ""
+      keywords: "{term}"
+      location: ""
+      facetFilters: {}
+      brand: ""
+      skills: []
+      categoryId: 0
+      alertId: ""
+      rcmCandidateId: ""
+    headers: {Accept: "application/json", Content-Type: "application/json"}
+    terms: ["embedded", "firmware", "AUTOSAR", "BSP"]
+    items: "jobSearchResult.*.response"
+    fields:
+      title: "unifiedStandardTitle"
+      location: "custprimecity"       # e.g. "Noida", "Gautam Buddha Nagar", "Gurugram"; empty for some India-wide roles
+      posted: "unifiedStandardStart"  # e.g. "11/3/26" (M/D/YY)
+    url_template: "https://careers.hcltech.com/job/{urlTitle}/{id}-en_US/"
+    page: {start: 0, step: 1, max: 60}
+
+  # verified 2026-11-13: samsung.com/in careers links to this Workday site (645 jobs). It has no Noida location facet;
+  # the only NCR facet is Gurugram (1 job). SRI-Noida itself only gives careers.sri-n@samsung.com (research.samsung.com/sri-n).
+  "Samsung R&D Institute Noida (SRI-N)":
+    type: workday
+    url: "https://sec.wd3.myworkdayjobs.com/Samsung_Careers"
+
+  # verified 2026-11-13: Incapsula returns HTTP 403 to python-requests (curl/browser get 200), so the script can't read it.
+  # The pages are server-rendered. ?location=noida (3 pages) and ?location=gurgaon (2 pages) list NCR jobs; the cards show
+  # city + title. India embedded roles are currently only in Bangalore/Chennai.
+  "GlobalLogic":
+    type: manual
+    url: "https://www.globallogic.com/in/career-search-page/?location=noida"
+    note: "Bot-protected (Incapsula 403 to scripts). Open in a browser: ?location=noida and ?location=gurgaon (also try ?keywords=embedded). Job pages are /in/careers/<slug>-irc<id>/."
+    status: "Blocked"
+
+  # verified 2026-11-13: endpoint the capgemini.com/in-en job-search page calls; country_code=in-en returns 718 India jobs
+  # (8 pages of 100). location is a city or comma-separated list (Noida 18, Gurgaon 34 single-city).
+  # apply_job_url opens the careers.capgemini.com job page, which carries datePosted. updated_at = last feed update.
+  # Both Capgemini input rows (Noida and Gurgaon) use this one portal.
+  "Capgemini (Engineering)": &capgemini
+    type: json_api
+    method: GET
+    url: "https://cg-jobstream-api.azurewebsites.net/api/job-search"
+    params: {page: "{page}", size: "100", country_code: "in-en", search: "{term}"}
+    headers: {Accept: "application/json"}
+    terms: [""]
+    items: "data"
+    fields:
+      title: "title"
+      location: "location"
+      posted: "updated_at"
+      desc: "description"
+      url: "apply_job_url"
+    page: {start: 1, step: 1, max: 12}
+
+  # verified 2026-11-13: same portal and identical recipe (YAML alias), so the checker fetches it once and
+  # reports each row's own city (Gurgaon currently has 'Embedded Firmware Development').
+  "Capgemini Engineering (ex-Aricent)": *capgemini
+
+  # verified 2026-11-13: ASP.NET WebForms; listing pages only via __doPostBack (no GET/JSON feed, sitemap 404).
+  # A plain GET shows only the first 12 of ~514 IT jobs. Paging a city-filtered result breaks on page 2 ('No jobs available').
+  "Tech Mahindra":
+    type: manual
+    url: "https://careers.techmahindra.com/CurrentOpportunity.aspx"
+    note: "Postback-only listing. In a browser: Advance Search -> Country India -> State Uttar Pradesh -> City NOIDA (and Haryana -> GURUGRAM, Delhi), or use the free-text search box for 'embedded'/'firmware'."
+    status: "Blocked"
+
+  # verified 2026-11-13: SuccessFactors CSB JSON API works without a CSRF token; the 'location' param filters by place:
+  # Noida=76, Greater Noida=91, Gurugram=114, New Delhi=84, Delhi=8 jobs (10 per page). Keyword search: embedded=64, firmware=24.
+  # Job page = https://careers.wipro.com/job/{urlTitle}/{id}-en_US/
+  "Wipro":
+    type: json_api
+    method: POST
+    url: "https://careers.wipro.com/services/recruiting/v1/jobs"
+    json:
+      locale: "en_US"
+      pageNumber: "{page}"
+      sortBy: ""
+      keywords: ""
+      location: "{term}"
+      facetFilters: {}
+      brand: ""
+      skills: []
+      categoryId: 0
+      alertId: ""
+      rcmCandidateId: ""
+    headers: {Accept: "application/json", Content-Type: "application/json"}
+    terms: ["Noida", "Greater Noida", "Gurugram", "New Delhi", "Delhi"]
+    items: "jobSearchResult.*.response"
+    fields:
+      title: "unifiedStandardTitle"
+      location: "sfstd_jobLocation_obj"   # list of cities, e.g. ["Gurugram"]
+      posted: "unifiedStandardStart"      # M/D/YY
+    url_template: "https://careers.wipro.com/job/{urlTitle}/{id}-en_US/"
+    page: {start: 0, step: 1, max: 15}
+
+  # verified 2026-11-13: nagarro.com/en/careers/job-search reads this public Azure Table (read-only SAS in the page's own JS,
+  # template_JS_NW_Careers_JobListing_Mar2022.min.js; expires 2090) and returns all 127 live jobs in one call (26 India, none Gurugram now).
+  # Job_Url points to jobs.smartrecruiters.com/Nagarro1/<id>. The SmartRecruiters API ({type: smartrecruiters, id: "Nagarro1"})
+  # also works, but it still lists stale 2023-24 postings, so the careers feed is the better source.
+  "Nagarro":
+    type: json_api
+    method: GET
+    url: "https://nagcareersite.table.core.windows.net/Main?sv=2019-02-02&spr=https%2Chttp&st=2023-09-26T11%3A18%3A20Z&se=2090-09-27T11%3A18%3A00Z&sp=r&sig=fvEYRZx0bQbrZxJIdob72MVhS5DTzT8q%2FvptRm8Y6yc%3D&tn=Main"
+    headers: {Accept: "application/json;odata=nometadata"}
+    terms: [""]
+    items: "value"
+    fields:
+      title: "Job_Title"
+      location: ["Job_City", "Job_Country"]
+      posted: "Timestamp"            # feed row timestamp (refreshed daily), not the original post date
+      desc: ["Job_Ad_Job_Description", "Job_Ad_Qualifications"]
+      url: "Job_Url"
+
+  # ======================= European MNCs =======================
+  # Portal recipes, agent E (European MNCs). Verified 2026-11-13 with one live call each
+  # (verify_recipes_E.py in this scratchpad). Keys = exact "Company" strings from the input Excel.
+
+  # verified 2026-11-13: PCSX search returns 86 NCR jobs for each location below (same set; location acts as a
+  # radius search). /api/apply/v2/jobs gives 403 "Not authorized for PCSX", so mode must be pcsx.
+  # Covers both input rows (Noida + Gurgaon).
+  "Ericsson":
+    type: eightfold
+    host: "jobs.ericsson.com"
+    domain: "ericsson.com"
+    mode: pcsx
+    locations: ["Noida, Uttar Pradesh, India", "Gurugram, Haryana, India"]
+    # extra: the search item has id/name/locations/postedTs (epoch s)/positionUrl ("/careers/job/{id}"). The full JD is at
+    # GET https://jobs.ericsson.com/api/pcsx/position_details?position_id={id}&domain=ericsson.com&hl=en -> data.jobDescription
+    # Use page size num=50 with start offset. Dedupe by id: both locations return the same 86 jobs.
+    detail_endpoint: "https://jobs.ericsson.com/api/pcsx/position_details?position_id={id}&domain=ericsson.com&hl=en"
+    page_size: 50
+
+  # verified 2026-11-13: India location facet returns 128 reqs. Detail workLocation gives the city (e.g. Bangalore).
+  # jobs.nokia.com/en/sites/CX_1 is a vanity front-end for this Oracle host.
+  "Nokia (Solutions & Networks)":
+    type: oracle
+    host: "fa-evmr-saasfaprod1.fa.ocs.oraclecloud.com"
+    site: "CX_1"
+    # extra: the India facet id for finder param selectedLocationsFacet. PrimaryLocation in the list is only "India",
+    # so the city must come from the details endpoint (recruitingCEJobRequisitionDetails ... expand=all):
+    # workLocation[].TownOrCity / otherWorkLocations. Page with limit=25 and offset.
+    location_facet_id: 300000000471745
+    city_from_details: true
+    public_job_url: "https://jobs.nokia.com/en/sites/CX_1/job/{id}"
+
+  # verified 2026-11-13: same Oracle recipe as above (separate key because the input Excel uses a different Company string).
+  "Nokia":
+    type: oracle
+    host: "fa-evmr-saasfaprod1.fa.ocs.oraclecloud.com"
+    site: "CX_1"
+    location_facet_id: 300000000471745   # extra: India facet (see entry above)
+    city_from_details: true              # extra: city only in details workLocation[].TownOrCity
+    public_job_url: "https://jobs.nokia.com/en/sites/CX_1/job/{id}"
+
+  # verified 2026-11-13: SearchJobs/Noida returns 20 results; all are Siemens EDA (India) jobs.
+  "Siemens EDA (Mentor)":
+    type: avature
+    url: "https://jobs.siemens.com/en_US/externaljobs"
+    # extra: Avature keyword search also matches location text, so search by place names plus skill words.
+    # URL = {url}/SearchJobs/{term}?folderOffset={n}. Page size is fixed at 6 (folderRecordsPerPage is ignored), so step
+    # folderOffset by 6 until it passes "N results". Each result is <article class="article article--result ...">
+    # holding a link to {url}/JobDetail/{id} and a "City , State , Country" subtitle.
+    # Detail pages are server-rendered with "Posted since DD-Mon-YYYY" and "Company SIEMENS EDA (INDIA) PRIVATE LIMITED".
+    terms: ["Noida", "embedded", "firmware"]
+    offset_param: folderOffset
+    page_size: 6
+    company_filter: "SIEMENS EDA"   # extra: optional; keep jobs whose detail "Company" contains this text
+
+  # verified 2026-11-13: SearchJobs/Gurugram returns 116 results and SearchJobs/embedded returns 106 (6 per page).
+  # Note: Siemens Energy jobs also show up on this portal.
+  "Siemens":
+    type: avature
+    url: "https://jobs.siemens.com/en_US/externaljobs"
+    terms: ["Gurugram", "Gurgaon", "New Delhi", "embedded", "firmware"]   # extra: see Siemens EDA entry
+    offset_param: folderOffset   # extra
+    page_size: 6                 # extra: fixed, not configurable
+
+  # verified 2026-11-13: GET /api/jobs?location=India returns 608 jobs (limit 100/page); keywords=embedded&location=India returns 74.
+  "Schneider Electric":
+    type: jibe
+    host: "careers.se.com"
+    location: "India"
+    # extra: endpoint GET https://careers.se.com/api/jobs?location=India&page={1..}&limit=100[&keywords={term}],
+    # items = jobs[].data. Filter NCR locally on data.full_location plus data.additional_locations[].city, because
+    # multi-location jobs carry the NCR city only as an additional location. Some jobs are posted as just "India" (no
+    # city); flag those "Location unclear". The JD is in data.description and the job URL is data.meta_data.canonical_url
+    # (https://careers.se.com/jobs/{req_id}?lang=en-us). The posted date is data.posted_date (e.g. "March 24, 2026").
+    page_size: 100
+    location_fields: ["full_location", "additional_locations", "location_name"]
+
+  # verified 2026-11-13: SmartRecruiters ?country=in returns 28 India postings (Gurgaon/Gurugram plus Bengaluru-area cities).
+  # Continental's automotive business (incl. the Gurgaon entity) moved to AUMOVIO in 2025. The careers portal is
+  # jobs.aumovio.com (TYPO3 front-end over SmartRecruiters).
+  # Continental's own SmartRecruiters id is "Continental" (verified: 12 India postings, none in Gurgaon:
+  # Faridabad, Meerut, Bengaluru, Mysuru, Kalyani). Add it as a second recipe if the script supports lists.
+  "Continental Automotive India":
+    type: smartrecruiters
+    id: "Aumovio"
+    country: "in"   # extra: postings API filter (?country=in); fullLocation has the city
+
+  # verified 2026-11-13: search API returns 474 reqs worldwide (17 in Gurgaon/Gurugram/Dhankot, Haryana); detail JD fetched OK.
+  "Hella India":
+    type: csod
+    corp: "hella"
+    site: 3
+    # extra (token handling): GET https://hella.csod.com/ux/ats/careersite/3/home?c=hella and read the anonymous JWT from
+    # the page's inline csod.context ("token":"...") plus endpoints.cloud ("https://uk.api.csod.com/").
+    # The career page itself uses this token. It expires after a few hours, so fetch a fresh one each run.
+    # Search: POST {cloud}rec-job-search/external/jobs with headers Authorization: Bearer {token}, Content-Type: application/json
+    # and body {careerSiteId:3, careerSitePageId:3, pageNumber:N, pageSize:100, cultureId:1, cultureName:"en-US",
+    # searchText:"", states:[], countryCodes:[], cities:[], placeID:"", radius:null, postingsWithinDays:null,
+    # customFieldCheckboxKeys:[], customFieldDropdowns:[], customFieldRadios:[]} -> data.totalCount, data.requisitions[]
+    # (requisitionId, displayJobTitle, locations[{city,state,country}], postingEffectiveDate).
+    # Detail (same bearer token): GET https://hella.csod.com/services/x/job-requisition/v2/requisitions/{id}/jobDetails?cultureId=1
+    # -> data.externalDescription. Job URL: https://hella.csod.com/ux/ats/careersite/3/home/requisition/{id}?c=hella
+    # NCR cities used by HELLA: Gurgaon, Gurugram, Dhankot (all Haryana).
+    cloud: "https://uk.api.csod.com/"
+    token_source: "csod.context.token in https://hella.csod.com/ux/ats/careersite/3/home?c=hella"
+    ncr_cities: ["Gurgaon", "Gurugram", "Dhankot"]
+
+  # verified 2026-11-13: /search/?q=&locationsearch=India returns 15 jobs (all Noida), all on one page.
+  "IDEMIA India":
+    type: sf_csb
+    host: "careers.idemia.com"
+    locationsearch: "India"
+    # extra: rows are <tr class="data-row"> holding a /job/... link, location ("Noida, IN, 201307") and date ("12 Nov 2026");
+    # page with startrow. The JD is in <span class="jobdescription"> on the job page.
+
+  # verified 2026-11-13: /search/?q=&locationsearch=India returns 20 jobs (17 Noida), all on one page.
+  "Barco India":
+    type: sf_csb
+    host: "jobs.barco.com"
+    locationsearch: "India"
+    # extra: same CSB markup as IDEMIA; the posted date is in the row (e.g. "Nov 3, 2026"); page with startrow if > page size.
+
+  # ======================= Semiconductor / US MNCs =======================
+  # Semiconductor / MNC portals (verified 2026-11-13)
+
+  # verified 2026-11-13: Eightfold apply-v2 API, 20 Greater Noida jobs (old Talent-soft portal retired)
+  "STMicroelectronics":
+    type: eightfold
+    host: "stmicroelectronics.eightfold.ai"
+    domain: "stmicroelectronics.com"
+    mode: v2
+    locations: ["Greater Noida, India"]
+
+  # verified 2026-11-13: linked from nxp.com careers page, but returns HTTP 500/422 to scripts -> script will report Blocked
+  "NXP Semiconductors":
+    type: workday
+    url: "https://nxp.wd3.myworkdayjobs.com/careers"
+
+  # verified 2026-11-13: Eightfold PCSX, 33 Noida jobs (apply-v2 API says "Not authorized for PCSX")
+  "Qualcomm India":
+    type: eightfold
+    host: "careers.qualcomm.com"
+    domain: "qualcomm.com"
+    mode: pcsx
+    locations: ["Noida, Uttar Pradesh, India"]
+
+  # verified 2026-11-13: jobs.renesas.com -> SmartRecruiters, 117 India jobs (9 Noida)
+  "Renesas Electronics India": {type: smartrecruiters, id: "RenesasElectronics"}
+
+  # verified 2026-11-13: Radancy TalentBrew, 465 jobs worldwide (3 Noida)
+  "Arm": {type: talentbrew, url: "https://careers.arm.com"}
+
+  # verified 2026-11-13: the site's own tRPC job API, 639 jobs worldwide (0 Noida today)
+  "MediaTek":
+    type: json_api
+    label: "MediaTek job API"
+    method: GET
+    url: "https://careers.mediatek.com/api/trpc/job.getJobs"
+    params:
+      input: '{"json":{"locales":"en_US","page":{page},"jobQueryInfo":{},"filters":{},"sortBy":"publishedDate","order":"DESC","limit":50}}'
+    terms: [""]
+    items: "result.data.json.jobs"
+    fields:
+      title: "title"
+      location: "properties.location.code"
+      posted: "publishedDate"
+      desc: "description"
+    url_template: "https://careers.mediatek.com/en/jobs/{id}"
+    page: {start: 1, step: 1, max: 25}
+
+  # verified 2026-11-13: Workday, 879 jobs, no NCR location
+  "Intel": {type: workday, url: "https://intel.wd1.myworkdayjobs.com/External"}
+
+  # verified 2026-11-13: Workday, 78 Noida jobs
+  "Cadence Design Systems": {type: workday, url: "https://cadence.wd1.myworkdayjobs.com/External_Careers"}
+
+  # verified 2026-11-13: Radancy TalentBrew, 694 jobs worldwide (26 Noida)
+  "Synopsys": {type: talentbrew, url: "https://careers.synopsys.com"}
+
+  # careers.ansys.com now redirects to careers.synopsys.com (Ansys is part of Synopsys)
+  "Ansys": {same_as: "Synopsys"}
+
+  # verified 2026-11-13: Workday, 28 Noida jobs
+  "Thales India": {type: workday, url: "https://thales.wd3.myworkdayjobs.com/Careers"}
+
+  # verified 2026-11-13: Avature, 355 jobs worldwide (India = Bangalore/Pune only today)
+  "Harman":
+    type: avature
+    url: "https://jobsearch.harman.com/en_US/careers"
+    offset_param: jobOffset
+    per_page_param: jobRecordsPerPage
+    per_page: 20
+    list_filter_mode: true
+
+  # verified 2026-11-13: Workday, 57 Gurugram jobs
+  "Stryker": {type: workday, url: "https://stryker.wd1.myworkdayjobs.com/StrykerCareers"}
+
+  # verified 2026-11-13: Workday, 12 Gurugram jobs
+  "Ciena India": {type: workday, url: "https://ciena.wd5.myworkdayjobs.com/Careers"}
+
+# Jin companies ko check nahi karna (Excel ka exact naam):
+skip: []

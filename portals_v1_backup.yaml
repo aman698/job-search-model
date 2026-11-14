@@ -1,0 +1,26 @@
+# portals.yaml - jab script kisi company ka portal khud na dhoondh paaye
+#
+# Run ke baad results/jobs_*.xlsx ki "Portal status" sheet dekho.
+# Jahan NOT FOUND / ERROR / generic aaye, us company ka asli job-search
+# page browser mein kholo, URL copy karo aur yahan daal do.
+# Naam bilkul wahi likho jo Excel ke "Company" column mein hai.
+#
+# Mostly sirf url kaafi hai - type script khud pehchaan lega
+# (Workday, Greenhouse, Lever, SmartRecruiters, Oracle HCM).
+# Eightfold portals ke liye type + domain bhi do.
+
+overrides:
+  # Examples (# hata ke apna URL daalo):
+  # "Napino Auto & Electronics":
+  #   url: "https://<company-ka-careers-page>"
+  # "Some Company On Eightfold":
+  #   url: "https://careers.example.com/careers"
+  #   type: eightfold
+  #   domain: example.com
+  # "Company With Plain HTML Jobs Page":
+  #   url: "https://www.example.com/current-openings"
+  #   type: generic
+
+# Jin companies ko check nahi karna:
+skip:
+  # - "Panasonic India"
